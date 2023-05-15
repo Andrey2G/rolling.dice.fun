@@ -1,6 +1,10 @@
 ﻿@page "/stats"
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 @using Microsoft.AspNetCore.SignalR.Client
+@using rolling.dice.fun.Data;
 @inject NavigationManager Navigation
+@inject RollingDiceService rollingDiceService
+@inject ProtectedLocalStorage ProtectedLocalStore
 
 
 <PageTitle>Statistics</PageTitle>
@@ -28,10 +32,7 @@
 
         hubConnection.On<int, int, int>("UpdateStatistics", (totalSize, userSize, userPrc) =>
         {
-            totalEntropySize = totalSize;
-            userEntropySize = userSize;
-            userEntropyPrc = userPrc;
-            InvokeAsync(StateHasChanged);
+            SetStats(totalSize, userSize, userPrc);
         });
 
         hubConnection.On<int>("StopTheCount", (result) =>
@@ -41,6 +42,22 @@
        });
 
         await hubConnection.StartAsync();
+
+        string username = "";
+        var result = await ProtectedLocalStore.GetAsync<string>("username");
+        if (result.Success)
+            username = result.Value ?? rollingDiceService.GenerateUsername();
+        else username = rollingDiceService.GenerateUsername();
+        var stats = rollingDiceService.GetUserStats(username);
+        SetStats(stats.TotalSize, stats.UserSize, stats.UserPrc);
+    }
+
+    void SetStats(int totalSize, int userSize, int userPrc)
+    {
+        totalEntropySize = totalSize;
+        userEntropySize = userSize;
+        userEntropyPrc = userPrc;
+        InvokeAsync(StateHasChanged);
     }
 
 }
