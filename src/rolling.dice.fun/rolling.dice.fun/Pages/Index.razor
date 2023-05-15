@@ -1,0 +1,21 @@
+﻿@page "/"
+
+<PageTitle>Start</PageTitle>
+
+<h1>Let's Rolling a dice!</h1>
+
+Let's start adding more entropy!
+
+
+<p role="status">Put your entropy data here: @entropy</p>
+
+<button class="btn btn-primary" @onclick="AddEntropyClicked">Add</button>
+
+@code {
+    private string entropy = "";
+
+    private void AddEntropyClicked()
+    {
+        //TODO: add entropy
+    }
+}
