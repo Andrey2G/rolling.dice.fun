@@ -7,15 +7,16 @@
 @inject ProtectedLocalStorage ProtectedLocalStore
 
 
+
 <PageTitle>Statistics</PageTitle>
 
 <h1>Statistics</h1>
 
 <p role="status">Total Entropy Size: @totalEntropySize</p>
 <p role="status">You Entropy Size: @userEntropySize</p>
-<p role="status">You Entropy %: @userEntropyPrc</p>
+<p role="status">You Entropy: @userEntropyPrc %</p>
 <br/>
-<p role="status">Rolling Dice RESULT: @rollingDiceResult</p>
+<h1 style="background-color:black; color:red;">Rolling Dice RESULT: @rollingDiceResult</h1>
 
 @code {
     private HubConnection? hubConnection;
@@ -26,6 +27,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        //start SignalR connection
         hubConnection = new HubConnectionBuilder()
             .WithUrl(Navigation.ToAbsoluteUri("/rollingdicehub"))
             .Build();
@@ -35,7 +37,7 @@
             SetStats(totalSize, userSize, userPrc);
         });
 
-        hubConnection.On<int>("StopTheCount", (result) =>
+        hubConnection.On<int>("RollingDiceResult", (result) =>
        {
            rollingDiceResult = result;
            InvokeAsync(StateHasChanged);
@@ -43,21 +45,58 @@
 
         await hubConnection.StartAsync();
 
-        string username = "";
-        var result = await ProtectedLocalStore.GetAsync<string>("username");
-        if (result.Success)
-            username = result.Value ?? rollingDiceService.GenerateUsername();
-        else username = rollingDiceService.GenerateUsername();
-        var stats = rollingDiceService.GetUserStats(username);
-        SetStats(stats.TotalSize, stats.UserSize, stats.UserPrc);
+        //load stats
+        try
+        {
+            string username = "";
+            var varName = RollingDiceService.PrepareStateName("username");
+            if (!string.IsNullOrEmpty(varName))
+            {
+                var result = await ProtectedLocalStore.GetAsync<string>(varName);
+                if (result.Success)
+                    username = result.Value ?? rollingDiceService.GenerateUsername();
+                else username = rollingDiceService.GenerateUsername();
+
+            }
+            else username = rollingDiceService.GenerateUsername();
+            if (!string.IsNullOrEmpty(hubConnection.ConnectionId))
+            {
+                rollingDiceService.UpdateUser(hubConnection.ConnectionId, username);
+                var stats = rollingDiceService.GetUserStats(username);
+                SetStats(stats.TotalSize, stats.UserSize, stats.UserPrc);
+            }
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            Console.WriteLine(ex.StackTrace);
+        }
     }
 
+    /// <summary>
+    /// set stats
+    /// </summary>
+    /// <param name="totalSize"></param>
+    /// <param name="userSize"></param>
+    /// <param name="userPrc"></param>
     void SetStats(int totalSize, int userSize, int userPrc)
     {
         totalEntropySize = totalSize;
         userEntropySize = userSize;
         userEntropyPrc = userPrc;
         InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// disapose SignalR connection when the page is closing
+    /// </summary>
+    /// <returns></returns>
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 
 }

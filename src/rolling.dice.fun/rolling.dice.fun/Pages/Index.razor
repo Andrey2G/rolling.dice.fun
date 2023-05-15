@@ -17,7 +17,7 @@ Let's start adding more entropy!
 
 <div class="form-group">
     <label>
-        User:
+        Username:
         <input @bind="userInput" />
     </label>
 </div>
@@ -30,10 +30,10 @@ Let's start adding more entropy!
 <textarea @bind="messageInput" rows=10 cols=50 />
 </div>
 <div>
-<button @onclick="SendEntropy" disabled="@(!IsConnected)">Add my entropy!</button>
+<button @onclick="SendEntropy" disabled="@(!IsConnected)">Add new entropy!</button>
 </div>
 <div>
-    <button @onclick="StopTheCount" disabled="@(!IsStoppedCountEnabled)">Stop the COUNT</button>
+    <button @onclick="StopTheCount" disabled="@(!IsStoppedCountEnabled)">Stop the COUNT! ;)</button>
 </div>
 <hr>
 
@@ -45,10 +45,23 @@ Let's start adding more entropy!
 </ul>
 
 @code {
+    /// <summary>
+    /// SignalR connection
+    /// </summary>
     private HubConnection? hubConnection;
+    /// <summary>
+    /// entropy from all users
+    /// </summary>
     private List<string> messages = new List<string>();
+    /// <summary>
+    /// username editbox
+    /// </summary>
     private string userInput = "";
+    /// <summary>
+    /// editbox for new entropy value
+    /// </summary>
     private string? messageInput;
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -81,35 +94,60 @@ Let's start adding more entropy!
         }
     }
 
+    /// <summary>
+    /// Loading user state (in case if connection slow or disconnected, the data get back after the resonnecting)
+    /// </summary>
+    /// <returns></returns>
     private async Task LoadStateAsync()
     {
-        var result = await ProtectedLocalStore.GetAsync<string>("username");
+        var result = await ProtectedLocalStore.GetAsync<string>(RollingDiceService.PrepareStateName("username"));
         if (result.Success)
             userInput =  result.Value ?? rollingDiceService.GenerateUsername();
         else userInput = rollingDiceService.GenerateUsername();
 
-        var stoppedResult = await ProtectedLocalStore.GetAsync<bool>("stopped");
+        var stoppedResult = await ProtectedLocalStore.GetAsync<bool>(RollingDiceService.PrepareStateName("stopped"));
         if (stoppedResult.Success)
             disableSendEntropy = stoppedResult.Value;
         else disableSendEntropy = false;
 
+        //enable Stop the Count buttong for admin
+        //TODO: should be replaced by Auth with checking the role of the current user
         if (userInput == "andrey") IsStoppedCountEnabled = true;
 
     }
 
+    /// <summary>
+    /// update the state of "Stop the Count" button when it clicked
+    /// </summary>
+    /// <returns></returns>
     private async Task UpdateStopTheCountState()
     {
         disableSendEntropy = true;
-        await ProtectedLocalStore.SetAsync("stopped", true);
+        await ProtectedLocalStore.SetAsync(RollingDiceService.PrepareStateName("stopped"), true);
     }
 
+    /// <summary>
+    /// update username state
+    /// </summary>
+    /// <param name="username"></param>
+    /// <returns></returns>
     private async Task UpdateState(string username)
     {
-        await ProtectedLocalStore.SetAsync("username", username);
+        await ProtectedLocalStore.SetAsync(RollingDiceService.PrepareStateName("username"), username);
     }
 
+    /// <summary>
+    /// prepare a message item before adding to the list
+    /// </summary>
+    /// <param name="user"></param>
+    /// <param name="message"></param>
+    /// <returns></returns>
     string PrepareMessage(string user, string message) => $"{user}: {message}";
 
+    /// <summary>
+    /// user clicked on  Add Entropy
+    /// </summary>
+    /// <returns></returns>
     private async Task SendEntropy()
     {
         if (hubConnection is not null)
@@ -121,6 +159,10 @@ Let's start adding more entropy!
         }
     }
 
+    /// <summary>
+    /// Admin clicked on "Stop the Count" button
+    /// </summary>
+    /// <returns></returns>
     private async Task StopTheCount()
     {
         if (hubConnection is not null)
@@ -131,12 +173,29 @@ Let's start adding more entropy!
         }
     }
 
+
+    /// <summary>
+    /// session not stopped
+    /// </summary>
     bool disableSendEntropy = false;
+    /// <summary>
+    /// check if need to disable Send Entropy button
+    /// only in case when SignalR connection still not active
+    /// or when the session is already stopped
+    /// </summary>
     public bool IsConnected =>
         hubConnection?.State == HubConnectionState.Connected && !disableSendEntropy;
 
+
+    /// <summary>
+    /// Stop the Count button is desabled for all by default
+    /// </summary>
     public bool IsStoppedCountEnabled=false;
 
+    /// <summary>
+    /// disapose SignalR connection when the page is closing
+    /// </summary>
+    /// <returns></returns>
     public async ValueTask DisposeAsync()
     {
         if (hubConnection is not null)
