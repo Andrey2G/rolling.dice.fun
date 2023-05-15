@@ -1,0 +1,46 @@
+﻿@page "/stats"
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+
+
+<PageTitle>Statistics</PageTitle>
+
+<h1>Statistics</h1>
+
+<p role="status">Total Entropy Size: @totalEntropySize</p>
+<p role="status">You Entropy Size: @userEntropySize</p>
+<p role="status">You Entropy %: @userEntropyPrc</p>
+<br/>
+<p role="status">Rolling Dice RESULT: @rollingDiceResult</p>
+
+@code {
+    private HubConnection? hubConnection;
+    private int totalEntropySize = 0;
+    private int userEntropySize = 0;
+    private int userEntropyPrc = 0;
+    private int rollingDiceResult = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/rollingdicehub"))
+            .Build();
+
+        hubConnection.On<int, int, int>("UpdateStatistics", (totalSize, userSize, userPrc) =>
+        {
+            totalEntropySize = totalSize;
+            userEntropySize = userSize;
+            userEntropyPrc = userPrc;
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<int>("StopTheCount", (result) =>
+       {
+           rollingDiceResult = result;
+           InvokeAsync(StateHasChanged);
+       });
+
+        await hubConnection.StartAsync();
+    }
+
+}
