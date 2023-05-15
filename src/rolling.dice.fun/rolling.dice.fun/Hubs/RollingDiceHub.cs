@@ -20,6 +20,12 @@ namespace rolling.dice.fun.Hubs
             await UpdateStats();
         }
 
+
+        public async Task StopTheCount()
+        {
+            await Clients.All.SendAsync("StoppingTheCount");
+        }
+
         async Task UpdateStats()
         {
             foreach (var user in RollingDiceService.Users)

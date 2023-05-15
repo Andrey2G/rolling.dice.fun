@@ -32,7 +32,9 @@ Let's start adding more entropy!
 <div>
 <button @onclick="SendEntropy" disabled="@(!IsConnected)">Add my entropy!</button>
 </div>
-
+<div>
+    <button @onclick="StopTheCount" disabled="@(!IsStoppedCountEnabled)">Stop the COUNT</button>
+</div>
 <hr>
 
 <ul id="messagesList">
@@ -62,6 +64,11 @@ Let's start adding more entropy!
             messages.Add(PrepareMessage(user, message));
             InvokeAsync(StateHasChanged);
         });
+        hubConnection.On("StoppingTheCount", () =>
+        {
+            InvokeAsync(UpdateStopTheCountState);
+            InvokeAsync(StateHasChanged);
+        });
         await hubConnection.StartAsync();
     }
 
@@ -80,6 +87,20 @@ Let's start adding more entropy!
         if (result.Success)
             userInput =  result.Value ?? rollingDiceService.GenerateUsername();
         else userInput = rollingDiceService.GenerateUsername();
+
+        var stoppedResult = await ProtectedLocalStore.GetAsync<bool>("stopped");
+        if (stoppedResult.Success)
+            disableSendEntropy = stoppedResult.Value;
+        else disableSendEntropy = false;
+
+        if (userInput == "andrey") IsStoppedCountEnabled = true;
+
+    }
+
+    private async Task UpdateStopTheCountState()
+    {
+        disableSendEntropy = true;
+        await ProtectedLocalStore.SetAsync("stopped", true);
     }
 
     private async Task UpdateState(string username)
@@ -100,8 +121,21 @@ Let's start adding more entropy!
         }
     }
 
+    private async Task StopTheCount()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync("StopTheCount");
+            disableSendEntropy = true;
+            StateHasChanged();
+        }
+    }
+
+    bool disableSendEntropy = false;
     public bool IsConnected =>
-        hubConnection?.State == HubConnectionState.Connected;
+        hubConnection?.State == HubConnectionState.Connected && !disableSendEntropy;
+
+    public bool IsStoppedCountEnabled=false;
 
     public async ValueTask DisposeAsync()
     {
